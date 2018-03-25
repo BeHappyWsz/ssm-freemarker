@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:mvc="http://www.springframework.org/schema/mvc" 
+	xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+		http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/aop
+	    http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/mvc
+		http://www.springframework.org/schema/mvc/spring-mvc-3.0.xsd">
+	
+	<!-- 1.整合mybatis过程 -->
+	<context:property-placeholder location="classpath:jdbc.properties" />
+	<bean id="dataSource" class="com.mchange.v2.c3p0.ComboPooledDataSource">
+		<property name="driverClass" value="${jdbc_driver}" />
+		<property name="jdbcUrl" value="${jdbc_url}" />
+		<property name="user" value="${jdbc_username}" />
+		<property name="password" value="${jdbc_password}" />
+
+		<property name="maxPoolSize" value="30" />
+		<property name="minPoolSize" value="10" />
+		<property name="autoCommitOnClose" value="false" />
+		<property name="checkoutTimeout" value="10000" />
+		<property name="acquireRetryAttempts" value="2" />
+	</bean> 
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+	</bean> 
+	<!-- 如果再设置模板,将覆盖SqlSessionFactory -->
+	<bean id="sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate" scope="prototype">
+		<constructor-arg index="0" ref="sqlSessionFactory"/>
+	</bean>
+	<!-- 注入jdbcTemplate -->
+	<!-- <bean id="jdbcTemplate" class="org.springframework.jdbc.core.JdbcTemplate">  
+        <property name="dataSource" ref="dataSource"/>  
+    </bean> -->
+    <!-- 基础service注入模版 -->
+	<bean id="baseService" class="freemarker.service.BaseService">
+		<property name="sqlSessionTemplate" ref="sqlSessionTemplate"/>
+	</bean>
+	<!-- 4.配置扫描Dao接口包，动态实现Dao接口，注入到spring容器中 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" />
+		<property name="annotationClass" value="org.springframework.stereotype.Repository"/>
+		<property name="basePackage" value="freemarker.dao" />
+	</bean> 
+	
+	<!-- 2.spring -->
+	<!-- 配置事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean> 
+	<!-- 配置基于注解的声明式事务 -->
+	<tx:annotation-driven transaction-manager="transactionManager" proxy-target-class="true"/>
+	<!-- spring注解、自动扫描 -->
+	<context:annotation-config/>
+	<context:component-scan base-package="freemarker"/>
+	
+	<!-- 配置SpringMVC -->
+	<!-- 1.开启SpringMVC注解模式 -->
+	<!-- 简化配置： 
+		(1)自动注册DefaultAnootationHandlerMapping,AnotationMethodHandlerAdapter 
+		(2)提供一些列：数据绑定，数字和日期的format @NumberFormat, @DateTimeFormat, xml,json默认读写支持 
+	-->
+	<mvc:annotation-driven />
+	<!-- 2.静态资源默认servlet配置
+		(1)加入对静态资源的处理：js,gif,png
+		(2)允许使用"/"做整体映射
+	 -->
+	 <mvc:default-servlet-handler/>	
+	 
+	 <!-- 3.freemarker/jsp -->
+	 <!-- <bean class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+	 	<property name="viewClass" value="org.springframework.web.servlet.view.JstlView" />
+	 	<property name="prefix" value="/WEB-INF/jsp/" />
+	 	<property name="suffix" value=".jsp" />
+	 </bean> -->
+	 
+	 <bean id="freemarkerConfig" class="org.springframework.web.servlet.view.freemarker.FreeMarkerConfigurer">
+	 	<property name="templateLoaderPath" value="/WEB-INF/freemarker/"/>
+	 </bean>
+	 
+	 <bean id="viewResolver" class="org.springframework.web.servlet.view.freemarker.FreeMarkerViewResolver">
+	 	<property name="viewClass" value="org.springframework.web.servlet.view.freemarker.FreeMarkerView"/>  
+	 	<!-- 
+	 		此处与freemarkerConfig中的freemarkerConfig冲突出现异常
+	 		<property name="prefix" value="/WEB-INF/freemarker/"></property> 
+	 	-->
+	 	<property name="suffix" value=".html"></property>
+	 	<property name="cache" value="true"></property>
+	 	<property name="contentType" value="text/html; charset=UTF-8"/>  
+	 </bean>
+</beans>
